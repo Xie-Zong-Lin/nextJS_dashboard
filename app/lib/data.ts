@@ -8,35 +8,31 @@ import {
   Revenue,
 } from './definitions';
 import { formatCurrency } from './utils';
-
 export async function fetchRevenue() {
   try {
-    // Artificially delay a response for demo purposes.
-    // Don't do this in production :)
 
-    // console.log('Fetching revenue data...');
-    // await new Promise((resolve) => setTimeout(resolve, 3000));
+    // 這句會錯，改變寫法
+    // const data = await sql<Revenue>`SELECT * FROM revenue`;
+    const client = await sql.connect();
+    const data = await client.query<Revenue>('SELECT * FROM revenue');
 
-    const data = await sql<Revenue>`SELECT * FROM revenue`;
-
-    // console.log('Data fetch completed after 3 seconds.');
-
-    return data.rows;
+    return data.rows
   } catch (error) {
     console.error('Database Error:', error);
-    throw new Error('Failed to fetch revenue data.');
+    // throw new Error('Failed to fetch revenue data.');
   }
 }
 
 export async function fetchLatestInvoices() {
   try {
-    const data = await sql<LatestInvoiceRaw>`
-      SELECT invoices.amount, customers.name, customers.image_url, customers.email, invoices.id
+    const client = await sql.connect();
+    const data = await client.query<LatestInvoiceRaw>(
+      `SELECT invoices.amount, customers.name, customers.image_url, customers.email, invoices.id
       FROM invoices
       JOIN customers ON invoices.customer_id = customers.id
       ORDER BY invoices.date DESC
-      LIMIT 5`;
-
+      LIMIT 5`
+    );
     const latestInvoices = data.rows.map((invoice) => ({
       ...invoice,
       amount: formatCurrency(invoice.amount),
@@ -50,16 +46,16 @@ export async function fetchLatestInvoices() {
 
 export async function fetchCardData() {
   try {
+    const client = await sql.connect();
     // You can probably combine these into a single SQL query
     // However, we are intentionally splitting them to demonstrate
     // how to initialize multiple queries in parallel with JS.
-    const invoiceCountPromise = sql`SELECT COUNT(*) FROM invoices`;
-    const customerCountPromise = sql`SELECT COUNT(*) FROM customers`;
-    const invoiceStatusPromise = sql`SELECT
+    const invoiceCountPromise = client.query(`SELECT COUNT(*) FROM invoices`);
+    const customerCountPromise = client.query(`SELECT COUNT(*) FROM customers`);
+    const invoiceStatusPromise = client.query(`SELECT
          SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS "paid",
          SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) AS "pending"
-         FROM invoices`;
-
+         FROM invoices`);
     const data = await Promise.all([
       invoiceCountPromise,
       customerCountPromise,
